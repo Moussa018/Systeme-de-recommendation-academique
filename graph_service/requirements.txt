@@ -1,5 +1,8 @@
-fastapi
-uvicorn
-rdflib
-pandas
-faker
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+rdflib==7.0.0
+owlrl==6.0.2
+SPARQLWrapper==2.0.0
+faker==25.0.0
+pydantic==2.7.1
+httpx==0.27.0
