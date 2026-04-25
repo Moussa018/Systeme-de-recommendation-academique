@@ -3,22 +3,55 @@
      xml:base="http://ensias.ma/academic"
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
      xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
-     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
-
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:academic="http://ensias.ma/academic#">
+    
     <owl:Ontology rdf:about="http://ensias.ma/academic"/>
 
     <owl:Class rdf:about="http://ensias.ma/academic#Student"/>
     <owl:Class rdf:about="http://ensias.ma/academic#Module"/>
-    <owl:Class rdf:about="http://ensias.ma/academic#Competence"/>
+    <owl:Class rdf:about="http://ensias.ma/academic#Skill"/>
 
-    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#hasPrerequisite">
+    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#hasMasteredSkill">
+        <rdfs:domain rdf:resource="http://ensias.ma/academic#Student"/>
+        <rdfs:range rdf:resource="http://ensias.ma/academic#Skill"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#hasCompletedModule">
+        <rdfs:domain rdf:resource="http://ensias.ma/academic#Student"/>
+        <rdfs:range rdf:resource="http://ensias.ma/academic#Module"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#requiresSkill">
+        <rdfs:domain rdf:resource="http://ensias.ma/academic#Module"/>
+        <rdfs:range rdf:resource="http://ensias.ma/academic#Skill"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#teachesSkill">
+        <rdfs:domain rdf:resource="http://ensias.ma/academic#Module"/>
+        <rdfs:range rdf:resource="http://ensias.ma/academic#Skill"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#isPrerequisiteOf">
         <rdfs:domain rdf:resource="http://ensias.ma/academic#Module"/>
         <rdfs:range rdf:resource="http://ensias.ma/academic#Module"/>
     </owl:ObjectProperty>
 
-    <owl:ObjectProperty rdf:about="http://ensias.ma/academic#mastersCompetence">
+    <owl:DatatypeProperty rdf:about="http://ensias.ma/academic#studentName">
         <rdfs:domain rdf:resource="http://ensias.ma/academic#Student"/>
-        <rdfs:range rdf:resource="http://ensias.ma/academic#Competence"/>
-    </owl:ObjectProperty>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    </owl:DatatypeProperty>
+
+    <owl:DatatypeProperty rdf:about="http://ensias.ma/academic#moduleName">
+        <rdfs:domain rdf:resource="http://ensias.ma/academic#Module"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    </owl:DatatypeProperty>
+
+    <owl:DatatypeProperty rdf:about="http://ensias.ma/academic#difficultyLevel">
+        <rdfs:domain rdf:resource="http://ensias.ma/academic#Module"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+    </owl:DatatypeProperty>
+
 </rdf:RDF>
