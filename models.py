@@ -33,7 +33,7 @@ class ModuleDB(Base):
     # Relationships
     interactions = relationship("InteractionDB", back_populates="module")
     prerequisites = relationship("PrerequisiteDB", foreign_keys="PrerequisiteDB.module_id", back_populates="module")
-    competencies = relationship("CompetencyDB", back_populates="module")
+    
 
 class InteractionDB(Base):
     __tablename__ = "interactions"
@@ -58,7 +58,6 @@ class CompetencyDB(Base):
     category = Column(String(100))
     
     # Relationships
-    modules = relationship("ModuleDB", back_populates="competencies")
     student_competencies = relationship("StudentCompetencyDB", back_populates="competency")
 
 class StudentCompetencyDB(Base):
