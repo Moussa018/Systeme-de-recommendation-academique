@@ -80,4 +80,4 @@ class PrerequisiteDB(Base):
     prerequisite_module_id = Column(Integer, ForeignKey("modules.id"))
     
     # Relationships
-    module = relationship("ModuleDB", foreign_keys=[module_id], back_populates="prerequisites")
+    module = relationship("ModuleDB", foreign_keys=[module_id], back_populates="prerequisites" )
