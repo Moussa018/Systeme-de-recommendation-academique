@@ -21,7 +21,7 @@ class StudentDB(Base):
 
 class ModuleDB(Base):
     __tablename__ = "modules"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), index=True)
     code = Column(String(50), unique=True)
@@ -29,10 +29,11 @@ class ModuleDB(Base):
     credits = Column(Integer)
     difficulty = Column(String(50))  # beginner, intermediate, advanced
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     interactions = relationship("InteractionDB", back_populates="module")
     prerequisites = relationship("PrerequisiteDB", foreign_keys="PrerequisiteDB.module_id", back_populates="module")
+    competencies = relationship("ModuleCompetencyDB", back_populates="module")
     
 
 class InteractionDB(Base):
@@ -51,14 +52,15 @@ class InteractionDB(Base):
 
 class CompetencyDB(Base):
     __tablename__ = "competencies"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, index=True)
     description = Column(Text)
     category = Column(String(100))
-    
+
     # Relationships
     student_competencies = relationship("StudentCompetencyDB", back_populates="competency")
+    module_competencies = relationship("ModuleCompetencyDB", back_populates="competency")
 
 class StudentCompetencyDB(Base):
     __tablename__ = "student_competencies"
@@ -74,10 +76,21 @@ class StudentCompetencyDB(Base):
 
 class PrerequisiteDB(Base):
     __tablename__ = "prerequisites"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     module_id = Column(Integer, ForeignKey("modules.id"), index=True)
     prerequisite_module_id = Column(Integer, ForeignKey("modules.id"))
-    
+
     # Relationships
-    module = relationship("ModuleDB", foreign_keys=[module_id], back_populates="prerequisites" )
+    module = relationship("ModuleDB", foreign_keys=[module_id], back_populates="prerequisites")
+
+class ModuleCompetencyDB(Base):
+    __tablename__ = "module_competencies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    module_id = Column(Integer, ForeignKey("modules.id"), index=True)
+    competency_id = Column(Integer, ForeignKey("competencies.id"), index=True)
+
+    # Relationships
+    module = relationship("ModuleDB", back_populates="competencies")
+    competency = relationship("CompetencyDB", back_populates="module_competencies")

@@ -5,7 +5,7 @@ from rdflib import Graph, Namespace, Literal, URIRef, RDF, RDFS
 from rdflib.namespace import XSD
 import os
 
-from models import StudentDB, ModuleDB, StudentCompetencyDB, PrerequisiteDB
+from models import StudentDB, ModuleDB, StudentCompetencyDB, PrerequisiteDB, ModuleCompetencyDB, CompetencyDB, InteractionDB
 from schemas import RecommendationItem
 
 logger = logging.getLogger(__name__)
@@ -50,13 +50,18 @@ class GraphService:
     def populate_graph(self, db: Session):
         """Populate the graph with data from database"""
         try:
+            # Idempotency guard — don't repopulate if already done
+            if len(self.g) > 20:
+                logger.debug("Graph already populated, skipping populate_graph")
+                return
+
             # Add students
             students = db.query(StudentDB).all()
             for student in students:
                 student_uri = self.ac[f"student_{student.id}"]
                 self.g.add((student_uri, RDF.type, self.ac.Student))
                 self.g.add((student_uri, RDFS.label, Literal(student.name)))
-            
+
             # Add modules
             modules = db.query(ModuleDB).all()
             for module in modules:
@@ -64,10 +69,17 @@ class GraphService:
                 self.g.add((module_uri, RDF.type, self.ac.Module))
                 self.g.add((module_uri, RDFS.label, Literal(module.title)))
                 self.g.add((module_uri, RDFS.comment, Literal(module.description)))
-            
+
+            # Add module-competency (teaches) relationships
+            module_competencies = db.query(ModuleCompetencyDB).all()
+            for mc in module_competencies:
+                module_uri = self.ac[f"module_{mc.module_id}"]
+                competency_uri = self.ac[f"competency_{mc.competency_id}"]
+                self.g.add((module_uri, self.ac.teaches, competency_uri))
+
             # Add competencies
-            competencies = db.query(StudentCompetencyDB).all()
-            for comp in competencies:
+            student_competencies = db.query(StudentCompetencyDB).all()
+            for comp in student_competencies:
                 student_uri = self.ac[f"student_{comp.student_id}"]
                 competency_uri = self.ac[f"competency_{comp.competency_id}"]
                 self.g.add((student_uri, self.ac.hasCompetency, competency_uri))
@@ -76,14 +88,14 @@ class GraphService:
                     self.ac.hasLevel,
                     Literal(comp.proficiency_level, datatype=XSD.float)
                 ))
-            
+
             # Add prerequisites
             prerequisites = db.query(PrerequisiteDB).all()
             for prereq in prerequisites:
                 module_uri = self.ac[f"module_{prereq.module_id}"]
                 prereq_uri = self.ac[f"module_{prereq.prerequisite_module_id}"]
                 self.g.add((module_uri, self.ac.prerequisite, prereq_uri))
-            
+
             logger.info(f"Graph populated with {len(self.g)} triples")
         except Exception as e:
             logger.error(f"Error populating graph: {str(e)}")
@@ -92,17 +104,22 @@ class GraphService:
     def get_recommendations(self, student_id: int, limit: int, db: Session) -> List[RecommendationItem]:
         """
         Get recommendations using SPARQL queries on the Knowledge Graph.
-        Strategy: Find modules that teach competencies needed for advancement
+        Strategy: Find modules that teach competencies the student has or needs
         """
         try:
             # Ensure graph is populated
             self.populate_graph(db)
-            
+
             recommendations = []
-            student_uri = f"http://academic.example.org/student_{student_id}"
-            
-            # Query: Find modules related to student's competencies
-            query = f"""
+
+            # Get modules student has already taken
+            taken_modules = db.query(InteractionDB.module_id).filter(
+                InteractionDB.student_id == student_id
+            ).all()
+            taken_module_ids = {m[0] for m in taken_modules}
+
+            # Query 1: Find modules that teach competencies the student already has
+            query1 = f"""
             PREFIX ac: <http://academic.example.org/>
             SELECT ?module ?label ?description
             WHERE {{
@@ -113,36 +130,30 @@ class GraphService:
                 ?module rdfs:comment ?description .
             }}
             """
-            
-            results = self.g.query(query)
-            
-            # Process results
+
+            results1 = self.g.query(query1)
+
             scored_modules = {}
-            for row in results:
+            for row in results1:
                 module_uri = str(row.module)
                 module_id = int(module_uri.split("_")[-1])
-                
-                # Avoid modules already taken
-                existing = db.query(StudentDB).filter(
-                    StudentDB.id == student_id
-                ).first()
-                
-                if module_id not in scored_modules:
-                    # Score based on competency alignment
+
+                # Skip already taken modules
+                if module_id not in taken_module_ids and module_id not in scored_modules:
                     score = self._calculate_semantic_score(student_id, module_id, db)
                     scored_modules[module_id] = {
                         "title": str(row.label),
                         "score": score,
-                        "reason": "Aligns with your competencies"
+                        "reason": "Builds on your current skills"
                     }
-            
+
             # Sort and limit
             sorted_modules = sorted(
                 scored_modules.items(),
                 key=lambda x: x[1]["score"],
                 reverse=True
             )[:limit]
-            
+
             for module_id, data in sorted_modules:
                 recommendations.append(RecommendationItem(
                     module_id=module_id,
@@ -152,9 +163,9 @@ class GraphService:
                     reason=data["reason"],
                     graph_score=data["score"]
                 ))
-            
+
             return recommendations
-        
+
         except Exception as e:
             logger.error(f"Error in graph recommendations: {str(e)}")
             return []
@@ -162,31 +173,51 @@ class GraphService:
     def _calculate_semantic_score(self, student_id: int, module_id: int, db: Session) -> float:
         """Calculate recommendation score based on semantic relationships"""
         score = 0.5  # Base score
-        
-        # Add points for prerequisite satisfaction
+
+        # Get module and its competencies
         module = db.query(ModuleDB).filter(ModuleDB.id == module_id).first()
         if module:
+            # Check prerequisites
             prerequisites = db.query(PrerequisiteDB).filter(
                 PrerequisiteDB.module_id == module_id
             ).all()
-            
+
             if not prerequisites:
-                score += 0.3  # No prerequisites boost score
+                score += 0.2  # No prerequisites boost score slightly
             else:
-                # Check if student has completed prerequisites
+                # Check if student has completed prerequisites (completion_rate > 0.8)
                 completed_prereqs = 0
                 for prereq in prerequisites:
-                    # Check interactions to see if student completed prerequisite
-                    from models import InteractionDB
                     interaction = db.query(InteractionDB).filter(
                         InteractionDB.student_id == student_id,
                         InteractionDB.module_id == prereq.prerequisite_module_id
                     ).first()
-                    if interaction and interaction.completion_rate > 0.8:
+                    if interaction and interaction.completion_rate > 80.0:
                         completed_prereqs += 1
-                
-                score += (completed_prereqs / len(prerequisites)) * 0.3
-        
+
+                # Prerequisite bonus: 0.2 if all met, proportional otherwise
+                if len(prerequisites) > 0:
+                    score += (completed_prereqs / len(prerequisites)) * 0.2
+
+            # Check competency alignment: boost if student has high proficiency in related skills
+            module_competencies = db.query(ModuleCompetencyDB).filter(
+                ModuleCompetencyDB.module_id == module_id
+            ).all()
+
+            if module_competencies:
+                total_alignment = 0.0
+                for mc in module_competencies:
+                    student_comp = db.query(StudentCompetencyDB).filter(
+                        StudentCompetencyDB.student_id == student_id,
+                        StudentCompetencyDB.competency_id == mc.competency_id
+                    ).first()
+                    if student_comp:
+                        total_alignment += student_comp.proficiency_level
+
+                if total_alignment > 0:
+                    avg_alignment = total_alignment / len(module_competencies)
+                    score += avg_alignment * 0.3
+
         return min(score, 1.0)
     
     def load_ontology(self):

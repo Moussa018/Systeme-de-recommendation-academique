@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 class StudentSchema(BaseModel):
@@ -60,3 +60,19 @@ class EvaluationMetrics(BaseModel):
     rmse: float
     mae: float
     ndcg: float
+
+class ApproachMetrics(BaseModel):
+    method: str
+    precision_at_k: float
+    recall_at_k: float
+    f1_at_k: float
+    ndcg_at_k: float
+    rmse: Optional[float] = None
+    mae: Optional[float] = None
+    n_evaluated: int = 0
+
+class ComparisonResult(BaseModel):
+    top_k: int
+    approaches: Dict[str, dict]
+    winner: str
+    analysis: str

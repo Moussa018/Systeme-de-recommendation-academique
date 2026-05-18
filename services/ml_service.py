@@ -31,28 +31,36 @@ class MLService:
         """Train the collaborative filtering model"""
         try:
             logger.info("Training ML model...")
-            
+
             # Get all students and modules
             self.students = db.query(StudentDB).all()
             self.modules = db.query(ModuleDB).all()
-            
+
             if not self.students or not self.modules:
                 logger.warning("Insufficient data for training")
                 return False
-            
+
             # Create interaction matrix
             interactions = db.query(InteractionDB).all()
             self.interaction_matrix = self._create_interaction_matrix(interactions)
-            
-            # Apply SVD
+
+            # Apply SVD with adaptive n_components
             if self.interaction_matrix.size > 0:
-                svd = TruncatedSVD(n_components=self.n_factors, random_state=42)
+                # SVD requires n_components <= min(n_rows, n_cols)
+                max_components = min(self.interaction_matrix.shape[0], self.interaction_matrix.shape[1])
+                n_components = min(self.n_factors, max_components)
+
+                if n_components < 1:
+                    logger.warning("Not enough data for SVD training")
+                    return False
+
+                svd = TruncatedSVD(n_components=n_components, random_state=42)
                 self.user_factors = svd.fit_transform(self.interaction_matrix)
                 self.item_factors = svd.components_.T
                 self.model_trained = True
-                logger.info(f"Model trained with {len(self.students)} students and {len(self.modules)} modules")
+                logger.info(f"Model trained with {len(self.students)} students and {len(self.modules)} modules (n_components={n_components})")
                 return True
-            
+
             return False
         except Exception as e:
             logger.error(f"Error training model: {str(e)}")
@@ -83,8 +91,8 @@ class MLService:
     
     def get_recommendations(self, student_id: int, limit: int, db: Session) -> List[RecommendationItem]:
         """
-        Get recommendations using collaborative filtering.
-        Find similar students and recommend modules they liked.
+        Get recommendations using collaborative filtering with SVD matrix reconstruction.
+        Uses predicted scores from matrix factorization.
         """
         try:
             # Train if not already trained
@@ -92,74 +100,58 @@ class MLService:
                 if not self.train(db):
                     logger.warning("Training failed, returning empty recommendations")
                     return []
-            
+
             student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
             if not student:
                 return []
-            
+
             # Find student index
             student_idx_map = {s.id: i for i, s in enumerate(self.students)}
             if student_id not in student_idx_map:
                 return []
-            
+
             student_idx = student_idx_map[student_id]
-            
+
             # Get student's latent factors
             if self.user_factors is None or student_idx >= len(self.user_factors):
                 return []
-            
-            student_vector = self.user_factors[student_idx]
-            
-            # Find similar students
-            similarities = self._compute_similarities(student_vector)
-            similar_students_indices = np.argsort(similarities)[::-1][1:6]  # Top 5 similar
-            
-            # Get modules liked by similar students
+
+            # Use SVD reconstruction: predicted_matrix = user_factors @ item_factors.T
+            predicted_scores = self.user_factors[student_idx] @ self.item_factors.T
+            predicted_scores = np.clip(predicted_scores, 0, 5.0)  # Clip to reasonable rating range
+
+            # Get modules student has already taken
+            taken_modules = db.query(InteractionDB).filter(
+                InteractionDB.student_id == student_id
+            ).all()
+            taken_module_ids = {i.module_id for i in taken_modules}
+
+            # Score all modules except already-taken
             module_idx_map = {m.id: i for i, m in enumerate(self.modules)}
-            module_scores = {}
-            
-            for sim_idx in similar_students_indices:
-                if sim_idx < len(self.interaction_matrix):
-                    sim_student_interactions = self.interaction_matrix[sim_idx]
-                    
-                    for module_idx, score in enumerate(sim_student_interactions):
-                        if score > 0:  # Student interacted with this module
-                            module_id = self.modules[module_idx].id
-                            
-                            # Skip if already taken
-                            existing = db.query(InteractionDB).filter(
-                                InteractionDB.student_id == student_id,
-                                InteractionDB.module_id == module_id
-                            ).first()
-                            
-                            if not existing:
-                                if module_id not in module_scores:
-                                    module_scores[module_id] = []
-                                module_scores[module_id].append(score)
-            
-            # Aggregate scores
-            final_scores = {
-                mid: np.mean(scores) for mid, scores in module_scores.items()
-            }
-            
-            # Sort and limit
-            sorted_modules = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
-            
+            scored_modules = []
+
+            for module_id, module in enumerate(self.modules):
+                if module.id not in taken_module_ids:
+                    score = float(predicted_scores[module_idx_map[module.id]])
+                    scored_modules.append((module.id, module.title, score))
+
+            # Sort by predicted score and limit
+            scored_modules.sort(key=lambda x: x[2], reverse=True)
+            scored_modules = scored_modules[:limit]
+
             recommendations = []
-            for module_id, score in sorted_modules:
-                module = db.query(ModuleDB).filter(ModuleDB.id == module_id).first()
-                if module:
-                    recommendations.append(RecommendationItem(
-                        module_id=module_id,
-                        module_title=module.title,
-                        score=float(score),
-                        confidence=min(0.95, score * 0.95),
-                        reason="Popular among similar students",
-                        ml_score=float(score)
-                    ))
-            
+            for module_id, title, score in scored_modules:
+                recommendations.append(RecommendationItem(
+                    module_id=module_id,
+                    module_title=title,
+                    score=score,
+                    confidence=min(0.95, abs(score) / 5.0 * 0.95),
+                    reason="Matches your learning profile",
+                    ml_score=score
+                ))
+
             return recommendations
-        
+
         except Exception as e:
             logger.error(f"Error in ML recommendations: {str(e)}")
             return []
@@ -168,14 +160,14 @@ class MLService:
         """Compute cosine similarities between student and all other students"""
         if self.user_factors is None:
             return np.zeros(len(self.students))
-        
+
         # Normalize vectors
         student_norm = np.linalg.norm(student_vector)
         if student_norm == 0:
             return np.zeros(len(self.students))
-        
+
         normalized_student = student_vector / student_norm
-        
+
         similarities = []
         for i, user_vector in enumerate(self.user_factors):
             user_norm = np.linalg.norm(user_vector)
@@ -185,5 +177,27 @@ class MLService:
                 normalized_user = user_vector / user_norm
                 similarity = np.dot(normalized_student, normalized_user)
                 similarities.append(similarity)
-        
+
         return np.array(similarities)
+
+    def predict_score(self, student_id: int, module_id: int, db: Session) -> float:
+        """Predict rating for a (student, module) pair using SVD reconstruction"""
+        try:
+            if not self.model_trained:
+                if not self.train(db):
+                    return 0.0
+
+            student_idx_map = {s.id: i for i, s in enumerate(self.students)}
+            module_idx_map = {m.id: i for i, m in enumerate(self.modules)}
+
+            if student_id not in student_idx_map or module_id not in module_idx_map:
+                return 0.0
+
+            student_idx = student_idx_map[student_id]
+            module_idx = module_idx_map[module_id]
+
+            predicted_score = float(self.user_factors[student_idx] @ self.item_factors[module_idx])
+            return np.clip(predicted_score, 0, 5.0)
+        except Exception as e:
+            logger.error(f"Error predicting score: {str(e)}")
+            return 0.0

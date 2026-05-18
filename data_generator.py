@@ -2,7 +2,7 @@ import random
 from faker import Faker
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models import Base, StudentDB, ModuleDB, CompetencyDB, StudentCompetencyDB, InteractionDB, PrerequisiteDB
+from models import Base, StudentDB, ModuleDB, CompetencyDB, StudentCompetencyDB, InteractionDB, PrerequisiteDB, ModuleCompetencyDB
 import logging
 
 logger = logging.getLogger(__name__)
@@ -141,7 +141,33 @@ def generate_sample_data():
             db.add(p)
         db.commit()
         logger.info(f"Created {len(prerequisites)} prerequisites")
-        
+
+        # 3b. Link modules to competencies they teach
+        module_competency_map = {
+            "CS101": ["Python Programming"],
+            "CS201": ["Python Programming"],
+            "DS101": ["Data Analysis", "Data Visualization"],
+            "AI101": ["Machine Learning", "Data Analysis"],
+            "AI201": ["Machine Learning", "Natural Language Processing"],
+            "WEB201": ["Web Development", "Python Programming"],
+            "DB101": ["Database Design"],
+            "CLOUD201": ["Cloud Computing"],
+            "NLP301": ["Natural Language Processing", "Machine Learning"],
+            "DV101": ["Data Visualization"],
+        }
+
+        module_competency_count = 0
+        for module in module_objects:
+            comp_names = module_competency_map.get(module.code, [])
+            for comp_name in comp_names:
+                competency = next((c for c in comp_objects if c.name == comp_name), None)
+                if competency:
+                    mc = ModuleCompetencyDB(module_id=module.id, competency_id=competency.id)
+                    db.add(mc)
+                    module_competency_count += 1
+        db.commit()
+        logger.info(f"Created {module_competency_count} module-competency links")
+
         # 4. Create students
         majors = ["Computer Science", "Data Science", "Software Engineering", "AI & ML"]
         students = []

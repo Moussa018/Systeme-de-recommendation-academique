@@ -69,3 +69,34 @@ htmlcov/
 # MacOS
 .AppleDouble
 .LSOverride
+
+# Project documentation (PDFs, guides)
+*.pdf
+Guide_*.md
+Descrptif*.pdf
+
+# Generated files
+*.rdb
+*.dump
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Node (if added later)
+node_modules/
+npm-debug.log
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Temporary files
+tmp/
+temp/
+*.tmp

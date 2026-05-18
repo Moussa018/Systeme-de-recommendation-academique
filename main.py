@@ -11,6 +11,7 @@ from schemas import StudentSchema, ModuleSchema, RecommendationResponse
 from services.graph_service import GraphService
 from services.ml_service import MLService
 from services.fusion_service import FusionService
+from services.evaluation_service import EvaluationService
 from data_generator import generate_sample_data
 
 # Setup logging
@@ -39,6 +40,7 @@ app.add_middleware(
 graph_service = GraphService()
 ml_service = MLService()
 fusion_service = FusionService(graph_service, ml_service)
+evaluation_service = EvaluationService(graph_service, ml_service, fusion_service)
 
 @app.on_event("startup")
 async def startup_event():
@@ -180,7 +182,7 @@ async def get_metrics(db: Session = Depends(get_db)):
     student_count = db.query(StudentDB).count()
     module_count = db.query(ModuleDB).count()
     interaction_count = db.query(InteractionDB).count()
-    
+
     return {
         "students": student_count,
         "modules": module_count,
@@ -188,6 +190,27 @@ async def get_metrics(db: Session = Depends(get_db)):
         "graph_status": "operational",
         "ml_status": "operational"
     }
+
+@app.get("/evaluate", tags=["Evaluation"])
+async def evaluate_system(top_k: int = 5, db: Session = Depends(get_db)):
+    """
+    Evaluate and compare all three recommendation approaches.
+    Uses leave-one-out validation on student interactions.
+
+    - **top_k**: Evaluate recommendation quality at this cutoff
+    """
+    try:
+        logger.info(f"Starting system evaluation with top_k={top_k}...")
+        result = evaluation_service.compare_approaches(db, top_k=top_k)
+
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "evaluation": result
+        }
+    except Exception as e:
+        logger.error(f"Error during evaluation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

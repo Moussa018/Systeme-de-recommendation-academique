@@ -2,10 +2,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database import Base
-from models import StudentDB, ModuleDB, CompetencyDB, StudentCompetencyDB, InteractionDB
+from models import StudentDB, ModuleDB, CompetencyDB, StudentCompetencyDB, InteractionDB, ModuleCompetencyDB
 from services.graph_service import GraphService
 from services.ml_service import MLService
 from services.fusion_service import FusionService
+from services.evaluation_service import EvaluationService
 
 # Use in-memory SQLite for testing
 @pytest.fixture(scope="session")
@@ -36,7 +37,7 @@ def sample_data(db_session):
         ModuleDB(title="Data Science", code="DS101", description="Data science basics", credits=4, difficulty="intermediate"),
     ]
     db_session.add_all(modules)
-    
+
     # Create students
     students = [
         StudentDB(name="Alice", email="alice@test.com", major="CS", year=1),
@@ -44,14 +45,42 @@ def sample_data(db_session):
         StudentDB(name="Charlie", email="charlie@test.com", major="DS", year=2),
     ]
     db_session.add_all(students)
-    
+
     # Create competencies
     competencies = [
         CompetencyDB(name="Python", category="Programming", description="Python skills"),
         CompetencyDB(name="Data Analysis", category="Data Science", description="Data analysis"),
     ]
     db_session.add_all(competencies)
-    
+
+    db_session.commit()
+
+    # Link modules to competencies
+    module_comps = [
+        ModuleCompetencyDB(module_id=modules[0].id, competency_id=competencies[0].id),
+        ModuleCompetencyDB(module_id=modules[1].id, competency_id=competencies[0].id),
+        ModuleCompetencyDB(module_id=modules[2].id, competency_id=competencies[1].id),
+    ]
+    db_session.add_all(module_comps)
+
+    # Add student competencies
+    student_comps = [
+        StudentCompetencyDB(student_id=students[0].id, competency_id=competencies[0].id, proficiency_level=0.5),
+        StudentCompetencyDB(student_id=students[1].id, competency_id=competencies[0].id, proficiency_level=0.8),
+        StudentCompetencyDB(student_id=students[2].id, competency_id=competencies[1].id, proficiency_level=0.7),
+    ]
+    db_session.add_all(student_comps)
+
+    # Add interactions (for ML training and evaluation)
+    interactions = [
+        InteractionDB(student_id=students[0].id, module_id=modules[0].id, rating=4.0, completion_rate=85.0),
+        InteractionDB(student_id=students[0].id, module_id=modules[1].id, rating=3.5, completion_rate=75.0),
+        InteractionDB(student_id=students[1].id, module_id=modules[0].id, rating=5.0, completion_rate=95.0),
+        InteractionDB(student_id=students[1].id, module_id=modules[2].id, rating=4.5, completion_rate=90.0),
+        InteractionDB(student_id=students[2].id, module_id=modules[2].id, rating=4.0, completion_rate=80.0),
+    ]
+    db_session.add_all(interactions)
+
     db_session.commit()
     return {
         "modules": modules,
@@ -133,7 +162,7 @@ class TestInteractionMatrix:
         service = MLService()
         service.students = sample_data["students"]
         service.modules = sample_data["modules"]
-        
+
         # Add some interactions
         interaction = InteractionDB(
             student_id=sample_data["students"][0].id,
@@ -143,12 +172,112 @@ class TestInteractionMatrix:
         )
         db_session.add(interaction)
         db_session.commit()
-        
+
         interactions = db_session.query(InteractionDB).all()
         matrix = service._create_interaction_matrix(interactions)
-        
+
         assert matrix.shape[0] == len(sample_data["students"])
         assert matrix.shape[1] == len(sample_data["modules"])
+
+
+class TestGraphWithData:
+    def test_module_competency_graph_population(self, db_session, sample_data):
+        """Test that ac:teaches triples are created"""
+        service = GraphService()
+        service.create_ontology()
+        service.populate_graph(db_session)
+
+        # Check that teaches triples exist
+        query = """
+        PREFIX ac: <http://academic.example.org/>
+        SELECT ?module ?competency
+        WHERE {
+            ?module ac:teaches ?competency .
+        }
+        """
+        results = service.g.query(query)
+        assert len(results) > 0, "No teaches triples found in graph"
+
+    def test_graph_returns_results_with_data(self, db_session, sample_data):
+        """Test that graph returns recommendations when data exists"""
+        service = GraphService()
+        service.create_ontology()
+        service.populate_graph(db_session)
+
+        student_id = sample_data["students"][0].id
+        recs = service.get_recommendations(student_id, 5, db_session)
+
+        assert isinstance(recs, list)
+
+
+class TestMLWithData:
+    def test_ml_training_with_data(self, db_session, sample_data):
+        """Test that ML model trains successfully with interactions"""
+        service = MLService()
+        result = service.train(db_session)
+        assert result is True, "ML training failed"
+        assert service.model_trained is True
+
+    def test_ml_svd_reconstruction(self, db_session, sample_data):
+        """Test that SVD reconstruction produces correct matrix shape"""
+        service = MLService()
+        service.train(db_session)
+
+        assert service.user_factors is not None
+        assert service.item_factors is not None
+        assert service.user_factors.shape[0] == len(sample_data["students"])
+        assert service.item_factors.shape[0] == len(sample_data["modules"])
+
+    def test_ml_returns_recommendations(self, db_session, sample_data):
+        """Test that ML returns recommendations"""
+        service = MLService()
+        student_id = sample_data["students"][0].id
+        recs = service.get_recommendations(student_id, 5, db_session)
+
+        assert isinstance(recs, list)
+
+    def test_predict_score(self, db_session, sample_data):
+        """Test that predict_score returns a valid rating"""
+        service = MLService()
+        service.train(db_session)
+
+        student_id = sample_data["students"][0].id
+        module_id = sample_data["modules"][1].id  # A module not in student's interactions
+
+        score = service.predict_score(student_id, module_id, db_session)
+        assert 0.0 <= score <= 5.0, f"Predicted score {score} out of valid range [0, 5]"
+
+
+class TestEvaluation:
+    def test_evaluation_compare_approaches(self, db_session, sample_data):
+        """Test that evaluation compares all three approaches"""
+        graph_svc = GraphService()
+        ml_svc = MLService()
+        fusion_svc = FusionService(graph_svc, ml_svc)
+        eval_svc = EvaluationService(graph_svc, ml_svc, fusion_svc)
+
+        result = eval_svc.compare_approaches(db_session, top_k=3)
+
+        assert "approaches" in result
+        assert "winner" in result
+        assert "analysis" in result
+        assert "graph" in result["approaches"]
+        assert "ml" in result["approaches"]
+        assert "hybrid" in result["approaches"]
+
+    def test_evaluation_metrics_exist(self, db_session, sample_data):
+        """Test that evaluation produces all required metrics"""
+        graph_svc = GraphService()
+        ml_svc = MLService()
+        fusion_svc = FusionService(graph_svc, ml_svc)
+        eval_svc = EvaluationService(graph_svc, ml_svc, fusion_svc)
+
+        metrics = eval_svc.evaluate_approach("hybrid", db_session, top_k=3)
+
+        required_metrics = ["precision_at_k", "recall_at_k", "f1_at_k", "ndcg_at_k", "n_evaluated"]
+        for metric in required_metrics:
+            assert metric in metrics, f"Missing metric: {metric}"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
