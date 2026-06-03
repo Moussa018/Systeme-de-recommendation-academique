@@ -107,7 +107,7 @@
 
 .content-grid {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr 480px;
   gap: 30px;
 }
 
