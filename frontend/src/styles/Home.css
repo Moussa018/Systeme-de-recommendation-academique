@@ -155,6 +155,8 @@
   gap: 10px;
   max-height: 400px;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
 }
 
 .course-item {
