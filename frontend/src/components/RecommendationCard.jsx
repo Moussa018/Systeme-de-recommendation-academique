@@ -3,7 +3,7 @@ import { formatScore, formatNumber } from '../utils/formatters';
 import '../styles/RecommendationCard.css';
 
 export const RecommendationCard = ({ recommendation, onClick }) => {
-  const scorePercent = (recommendation.score / 5) * 100;
+  const scorePercent = recommendation.score * 100;
   const hasGraphScore = recommendation.graph_score !== null && recommendation.graph_score !== undefined && recommendation.graph_score > 0;
   const hasMLScore = recommendation.ml_score !== null && recommendation.ml_score !== undefined && recommendation.ml_score > 0;
 
@@ -12,7 +12,7 @@ export const RecommendationCard = ({ recommendation, onClick }) => {
       <div className="card-header">
         <h3>{recommendation.module_title}</h3>
         <div className="score-badge">
-          {formatScore(recommendation.score)}/5.00
+          {formatNumber(scorePercent)}%
         </div>
       </div>
 
@@ -31,13 +31,13 @@ export const RecommendationCard = ({ recommendation, onClick }) => {
           {hasGraphScore && (
             <span className="method-score">
               <span className="method-label">Graph:</span>
-              <span className="method-value">{formatScore(recommendation.graph_score)}</span>
+              <span className="method-value">{formatNumber(recommendation.graph_score * 100)}%</span>
             </span>
           )}
           {hasMLScore && (
             <span className="method-score">
               <span className="method-label">ML:</span>
-              <span className="method-value">{formatScore(recommendation.ml_score)}</span>
+              <span className="method-value">{formatNumber(recommendation.ml_score * 100)}%</span>
             </span>
           )}
         </div>
