@@ -1,0 +1,121 @@
+.coefficients-box {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-top: 4px solid #667eea;
+}
+
+.coefficients-box h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 16px;
+}
+
+.phase-indicator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.phase-label {
+  color: #666;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.phase-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.phase-badge.cold-start {
+  background-color: #ff6b6b;
+}
+
+.phase-badge.transition {
+  background-color: #ffa500;
+}
+
+.phase-badge.mature {
+  background-color: #51cf66;
+}
+
+.interaction-count {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #666;
+}
+
+.interaction-count strong {
+  color: #333;
+  font-size: 18px;
+}
+
+.weights-display {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.weight-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weight-item label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.weight-bar {
+  height: 12px;
+  background-color: #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.weight-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.weight-fill.graph {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.weight-fill.ml {
+  background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+}
+
+.weight-value {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.info-text {
+  background-color: #f9f9f9;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+}
+
+.info-text p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
