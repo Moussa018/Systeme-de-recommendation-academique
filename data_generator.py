@@ -204,18 +204,19 @@ def generate_sample_data():
                 levels = [prof.get(cid, 0.15) for cid in comp_ids]
                 affinity = sum(levels) / len(levels)
             else:
-                affinity = 0.3  # No competency mapping -> neutral interest
+                affinity = 0.4  # No competency mapping -> neutral-to-good interest
 
-            # Map affinity (0..1) to a realistic, positive-skewed rating band:
-            #   affinity 0.0 -> ~2.6,  affinity 1.0 -> ~4.8
-            base = 2.6 + affinity * 2.2
-            rating = base + random.gauss(0, 0.35)
-            rating = max(1.5, min(5.0, rating))
+            # Map affinity (0..1) to a generous rating band:
+            #   affinity 0.0 -> ~2.5,  affinity 1.0 -> ~5.0
+            # Shifted higher so even weak matches are 2.5+, strong matches 4.5+
+            base = 2.5 + affinity * 2.5
+            rating = base + random.gauss(0, 0.3)  # tighter variance for consistency
+            rating = max(2.0, min(5.0, rating))  # clamp to 2-5
             rating = round(rating * 2) / 2  # snap to nearest 0.5 for realism
 
             # Completion correlates with how much they liked it, plus noise
-            completion = 45 + (rating / 5.0) * 50 + random.gauss(0, 8)
-            completion = max(30.0, min(100.0, completion))
+            completion = 50 + (rating / 5.0) * 45 + random.gauss(0, 6)
+            completion = max(35.0, min(100.0, completion))
 
             return rating, completion
 
