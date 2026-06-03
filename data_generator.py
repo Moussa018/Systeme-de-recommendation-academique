@@ -43,78 +43,38 @@ def generate_sample_data():
         db.commit()
         logger.info(f"Created {len(comp_objects)} competencies")
         
-        # 2. Create modules
+        # 2. Create modules (30 courses total)
         modules_data = [
-            {
-                "title": "Introduction to Python",
-                "code": "CS101",
-                "description": "Fundamentals of Python programming",
-                "credits": 3,
-                "difficulty": "beginner"
-            },
-            {
-                "title": "Advanced Python",
-                "code": "CS201",
-                "description": "Advanced Python concepts and patterns",
-                "credits": 3,
-                "difficulty": "intermediate"
-            },
-            {
-                "title": "Data Science Fundamentals",
-                "code": "DS101",
-                "description": "Introduction to data science and analysis",
-                "credits": 4,
-                "difficulty": "intermediate"
-            },
-            {
-                "title": "Machine Learning Basics",
-                "code": "AI101",
-                "description": "Introduction to machine learning algorithms",
-                "credits": 4,
-                "difficulty": "intermediate"
-            },
-            {
-                "title": "Advanced Machine Learning",
-                "code": "AI201",
-                "description": "Deep learning and neural networks",
-                "credits": 4,
-                "difficulty": "advanced"
-            },
-            {
-                "title": "Web Development with FastAPI",
-                "code": "WEB201",
-                "description": "Building APIs with FastAPI framework",
-                "credits": 3,
-                "difficulty": "intermediate"
-            },
-            {
-                "title": "Database Design",
-                "code": "DB101",
-                "description": "Relational database design and SQL",
-                "credits": 3,
-                "difficulty": "intermediate"
-            },
-            {
-                "title": "Cloud Computing with AWS",
-                "code": "CLOUD201",
-                "description": "Cloud infrastructure and deployment",
-                "credits": 3,
-                "difficulty": "intermediate"
-            },
-            {
-                "title": "Natural Language Processing",
-                "code": "NLP301",
-                "description": "Advanced NLP techniques and applications",
-                "credits": 4,
-                "difficulty": "advanced"
-            },
-            {
-                "title": "Data Visualization",
-                "code": "DV101",
-                "description": "Creating effective data visualizations",
-                "credits": 2,
-                "difficulty": "beginner"
-            },
+            {"title": "Introduction to Python", "code": "CS101", "description": "Fundamentals of Python programming", "credits": 3, "difficulty": "beginner"},
+            {"title": "Advanced Python", "code": "CS201", "description": "Advanced Python concepts and patterns", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Data Science Fundamentals", "code": "DS101", "description": "Introduction to data science and analysis", "credits": 4, "difficulty": "intermediate"},
+            {"title": "Machine Learning Basics", "code": "AI101", "description": "Introduction to machine learning algorithms", "credits": 4, "difficulty": "intermediate"},
+            {"title": "Advanced Machine Learning", "code": "AI201", "description": "Deep learning and neural networks", "credits": 4, "difficulty": "advanced"},
+            {"title": "Web Development with FastAPI", "code": "WEB201", "description": "Building APIs with FastAPI framework", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Database Design", "code": "DB101", "description": "Relational database design and SQL", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Cloud Computing with AWS", "code": "CLOUD201", "description": "Cloud infrastructure and deployment", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Natural Language Processing", "code": "NLP301", "description": "Advanced NLP techniques and applications", "credits": 4, "difficulty": "advanced"},
+            {"title": "Data Visualization", "code": "DV101", "description": "Creating effective data visualizations", "credits": 2, "difficulty": "beginner"},
+            {"title": "JavaScript Essentials", "code": "WEB101", "description": "Core JavaScript programming for web development", "credits": 3, "difficulty": "beginner"},
+            {"title": "React.js Development", "code": "WEB301", "description": "Building modern UIs with React", "credits": 4, "difficulty": "intermediate"},
+            {"title": "Node.js Backend Development", "code": "WEB302", "description": "Server-side JavaScript with Node.js", "credits": 4, "difficulty": "intermediate"},
+            {"title": "Statistics for Data Science", "code": "DS201", "description": "Statistical methods for data analysis", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Deep Learning Advanced", "code": "AI301", "description": "Neural networks and advanced deep learning", "credits": 4, "difficulty": "advanced"},
+            {"title": "Computer Vision", "code": "AI302", "description": "Image processing and computer vision applications", "credits": 4, "difficulty": "advanced"},
+            {"title": "Software Engineering Principles", "code": "CS301", "description": "Design patterns and software architecture", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Microservices Architecture", "code": "ARCH201", "description": "Designing scalable microservices systems", "credits": 4, "difficulty": "advanced"},
+            {"title": "DevOps Fundamentals", "code": "DEVOPS101", "description": "CI/CD, containerization, and deployment", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Kubernetes & Container Orchestration", "code": "DEVOPS201", "description": "Managing containerized applications at scale", "credits": 4, "difficulty": "advanced"},
+            {"title": "PostgreSQL Advanced", "code": "DB201", "description": "Advanced SQL and database optimization", "credits": 3, "difficulty": "intermediate"},
+            {"title": "NoSQL Databases", "code": "DB301", "description": "MongoDB, Cassandra, and distributed databases", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Big Data Processing", "code": "DS301", "description": "Apache Spark and distributed data processing", "credits": 4, "difficulty": "advanced"},
+            {"title": "Time Series Analysis", "code": "DS302", "description": "Forecasting and temporal data analysis", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Reinforcement Learning", "code": "AI401", "description": "Learning through agent interactions and rewards", "credits": 4, "difficulty": "advanced"},
+            {"title": "Recommender Systems", "code": "AI402", "description": "Collaborative filtering and personalization", "credits": 4, "difficulty": "advanced"},
+            {"title": "Cybersecurity Essentials", "code": "SEC101", "description": "Security fundamentals and best practices", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Cryptography", "code": "SEC201", "description": "Encryption, hashing, and secure communication", "credits": 3, "difficulty": "advanced"},
+            {"title": "Mobile App Development", "code": "MOB101", "description": "Cross-platform mobile development", "credits": 3, "difficulty": "intermediate"},
+            {"title": "Blockchain Technology", "code": "CHAIN101", "description": "Blockchain fundamentals and smart contracts", "credits": 4, "difficulty": "advanced"},
         ]
         
         module_objects = []
@@ -154,6 +114,26 @@ def generate_sample_data():
             "CLOUD201": ["Cloud Computing"],
             "NLP301": ["Natural Language Processing", "Machine Learning"],
             "DV101": ["Data Visualization"],
+            "WEB101": ["Web Development"],
+            "WEB301": ["Web Development"],
+            "WEB302": ["Web Development", "Python Programming"],
+            "DS201": ["Data Analysis"],
+            "AI301": ["Machine Learning"],
+            "AI302": ["Machine Learning"],
+            "CS301": ["Python Programming"],
+            "ARCH201": ["Web Development", "Cloud Computing"],
+            "DEVOPS101": ["Cloud Computing"],
+            "DEVOPS201": ["Cloud Computing"],
+            "DB201": ["Database Design"],
+            "DB301": ["Database Design"],
+            "DS302": ["Data Analysis"],
+            "DS301": ["Data Analysis"],
+            "AI401": ["Machine Learning"],
+            "AI402": ["Machine Learning"],
+            "SEC101": ["Database Design"],
+            "SEC201": ["Database Design"],
+            "MOB101": ["Web Development"],
+            "CHAIN101": ["Database Design"],
         }
 
         module_competency_count = 0
@@ -200,8 +180,8 @@ def generate_sample_data():
         # 6. Create interactions (student-module interactions)
         interactions = []
         for student in students:
-            # Each student has interacted with 3-8 modules
-            selected_modules = random.sample(module_objects, k=random.randint(3, 8))
+            # Each student has interacted with 2-5 modules (plenty more to explore with 30 courses)
+            selected_modules = random.sample(module_objects, k=random.randint(2, 5))
             for module in selected_modules:
                 interaction = InteractionDB(
                     student_id=student.id,
