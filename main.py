@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import logging
+from pydantic import BaseModel
 
 from database import engine, Base, get_db
 from models import StudentDB, ModuleDB, InteractionDB
@@ -17,6 +18,48 @@ from data_generator import generate_sample_data
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class LoginRequest(BaseModel):
+    student_id: int
+
+
+class InteractionUpdate(BaseModel):
+    rating: Optional[float] = None
+    completion_rate: Optional[float] = None
+
+
+class ModuleResponse(BaseModel):
+    id: int
+    title: str
+    code: str
+    description: str
+    credits: int
+    difficulty: str
+
+    class Config:
+        from_attributes = True
+
+
+class StudentProfile(BaseModel):
+    id: int
+    name: str
+    email: str
+    major: str
+    year: int
+    interaction_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class RecommendationWithCoefficients(BaseModel):
+    student_id: int
+    recommendations: List
+    interaction_count: int
+    alpha: float
+    beta: float
+    timestamp: str
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -70,7 +113,61 @@ async def health_check():
         }
     }
 
-@app.get("/recommendations", response_model=RecommendationResponse, tags=["Recommendations"])
+
+@app.post("/auth/login", tags=["Auth"])
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    """Login with student ID"""
+    student = db.query(StudentDB).filter(StudentDB.id == request.student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    return {
+        "id": student.id,
+        "name": student.name,
+        "email": student.email,
+        "major": student.major,
+        "year": student.year,
+        "token": f"student_{student.id}"
+    }
+
+
+@app.get("/modules", response_model=List[ModuleResponse], tags=["Modules"])
+async def get_all_modules(db: Session = Depends(get_db)):
+    """Get all available modules"""
+    modules = db.query(ModuleDB).all()
+    return modules
+
+
+@app.get("/modules/{module_id}", response_model=ModuleResponse, tags=["Modules"])
+async def get_module(module_id: int, db: Session = Depends(get_db)):
+    """Get module details"""
+    module = db.query(ModuleDB).filter(ModuleDB.id == module_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    return module
+
+
+@app.get("/students/{student_id}/profile", response_model=StudentProfile, tags=["Students"])
+async def get_student_profile(student_id: int, db: Session = Depends(get_db)):
+    """Get student profile with interaction count"""
+    student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    interaction_count = db.query(InteractionDB).filter(
+        InteractionDB.student_id == student_id
+    ).count()
+
+    return {
+        "id": student.id,
+        "name": student.name,
+        "email": student.email,
+        "major": student.major,
+        "year": student.year,
+        "interaction_count": interaction_count
+    }
+
+@app.get("/recommendations", tags=["Recommendations"])
 async def get_recommendations(
     student_id: int,
     limit: int = 5,
@@ -79,8 +176,8 @@ async def get_recommendations(
     db: Session = Depends(get_db)
 ):
     """
-    Get personalized module recommendations for a student.
-    
+    Get personalized module recommendations for a student with coefficients.
+
     - **student_id**: ID of the student
     - **limit**: Number of recommendations to return
     - **use_graph**: Include Knowledge Graph recommendations
@@ -91,7 +188,22 @@ async def get_recommendations(
         student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
         if not student:
             raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
-        
+
+        # Get interaction count
+        interaction_count = db.query(InteractionDB).filter(
+            InteractionDB.student_id == student_id
+        ).count()
+
+        # Calculate weights (from fusion service logic)
+        if interaction_count < 5:
+            alpha, beta = 0.8, 0.2
+        elif interaction_count < 20:
+            progress = (interaction_count - 5) / 15
+            alpha = 0.8 - (0.5 * progress)
+            beta = 0.2 + (0.5 * progress)
+        else:
+            alpha, beta = 0.3, 0.7
+
         # Get recommendations from fusion service
         recommendations = fusion_service.get_recommendations(
             student_id=student_id,
@@ -100,14 +212,16 @@ async def get_recommendations(
             use_ml=use_ml,
             db=db
         )
-        
-        return RecommendationResponse(
-            student_id=student_id,
-            recommendations=recommendations,
-            timestamp=datetime.now().isoformat(),
-            method="hybrid"
-        )
-    
+
+        return {
+            "student_id": student_id,
+            "recommendations": [r.dict() for r in recommendations],
+            "interaction_count": interaction_count,
+            "alpha": round(alpha, 3),
+            "beta": round(beta, 3),
+            "timestamp": datetime.now().isoformat()
+        }
+
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -166,6 +280,76 @@ async def create_student(student: StudentSchema, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_student)
     return db_student
+
+
+@app.get("/students/{student_id}/interactions", tags=["Interactions"])
+async def get_student_interactions(student_id: int, db: Session = Depends(get_db)):
+    """Get all interactions for a student"""
+    interactions = db.query(InteractionDB).filter(
+        InteractionDB.student_id == student_id
+    ).all()
+
+    result = []
+    for interaction in interactions:
+        module = db.query(ModuleDB).filter(ModuleDB.id == interaction.module_id).first()
+        result.append({
+            "id": interaction.id,
+            "module_id": interaction.module_id,
+            "module_title": module.title if module else "Unknown",
+            "rating": interaction.rating,
+            "completion_rate": interaction.completion_rate,
+            "timestamp": interaction.timestamp.isoformat()
+        })
+
+    return result
+
+
+@app.post("/students/{student_id}/modules/{module_id}/interact", tags=["Interactions"])
+async def update_or_create_interaction(
+    student_id: int,
+    module_id: int,
+    data: InteractionUpdate,
+    db: Session = Depends(get_db)
+):
+    """Create or update a student-module interaction"""
+    student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    module = db.query(ModuleDB).filter(ModuleDB.id == module_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    interaction = db.query(InteractionDB).filter(
+        InteractionDB.student_id == student_id,
+        InteractionDB.module_id == module_id
+    ).first()
+
+    if interaction:
+        if data.rating is not None:
+            interaction.rating = data.rating
+        if data.completion_rate is not None:
+            interaction.completion_rate = data.completion_rate
+    else:
+        interaction = InteractionDB(
+            student_id=student_id,
+            module_id=module_id,
+            rating=data.rating or 0.0,
+            completion_rate=data.completion_rate or 0.0
+        )
+        db.add(interaction)
+
+    db.commit()
+    db.refresh(interaction)
+
+    return {
+        "id": interaction.id,
+        "student_id": interaction.student_id,
+        "module_id": interaction.module_id,
+        "rating": interaction.rating,
+        "completion_rate": interaction.completion_rate,
+        "timestamp": interaction.timestamp.isoformat()
+    }
 
 @app.post("/modules", response_model=ModuleSchema, tags=["Modules"])
 async def create_module(module: ModuleSchema, db: Session = Depends(get_db)):
