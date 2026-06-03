@@ -163,31 +163,75 @@ def generate_sample_data():
         db.commit()
         logger.info(f"Created {len(students)} students")
         
-        # 5. Assign competencies to students
+        # 5. Assign competencies to students (track proficiency per student for rating logic)
+        student_proficiency = {}  # {student_id: {competency_id: proficiency_level}}
         for student in students:
             # Each student has varying competency levels
-            selected_comps = random.sample(comp_objects, k=random.randint(2, 6))
+            selected_comps = random.sample(comp_objects, k=random.randint(3, 6))
+            student_proficiency[student.id] = {}
             for comp in selected_comps:
+                level = random.uniform(0.4, 0.95)
                 student_comp = StudentCompetencyDB(
                     student_id=student.id,
                     competency_id=comp.id,
-                    proficiency_level=random.uniform(0.3, 0.9)
+                    proficiency_level=level
                 )
                 db.add(student_comp)
+                student_proficiency[student.id][comp.id] = level
         db.commit()
         logger.info("Assigned competencies to students")
-        
+
+        # Build module -> competency ids lookup (so ratings can reflect real alignment)
+        module_comp_ids = {}  # {module_id: [competency_id, ...]}
+        for module in module_objects:
+            comp_names = module_competency_map.get(module.code, [])
+            ids = [c.id for c in comp_objects if c.name in comp_names]
+            module_comp_ids[module.id] = ids
+
+        def compute_rating(student, module):
+            """
+            Generate a realistic, structured rating.
+            A student rates a module higher when they are strong in the
+            competencies the module teaches. This gives the SVD a real
+            pattern to learn instead of pure noise.
+            """
+            prof = student_proficiency.get(student.id, {})
+            comp_ids = module_comp_ids.get(module.id, [])
+
+            if comp_ids:
+                # Average proficiency the student has in this module's competencies
+                # (missing competency counts as a small baseline interest)
+                levels = [prof.get(cid, 0.15) for cid in comp_ids]
+                affinity = sum(levels) / len(levels)
+            else:
+                affinity = 0.3  # No competency mapping -> neutral interest
+
+            # Map affinity (0..1) to a realistic, positive-skewed rating band:
+            #   affinity 0.0 -> ~2.6,  affinity 1.0 -> ~4.8
+            base = 2.6 + affinity * 2.2
+            rating = base + random.gauss(0, 0.35)
+            rating = max(1.5, min(5.0, rating))
+            rating = round(rating * 2) / 2  # snap to nearest 0.5 for realism
+
+            # Completion correlates with how much they liked it, plus noise
+            completion = 45 + (rating / 5.0) * 50 + random.gauss(0, 8)
+            completion = max(30.0, min(100.0, completion))
+
+            return rating, completion
+
         # 6. Create interactions (student-module interactions)
         interactions = []
         for student in students:
-            # Each student has interacted with 2-5 modules (plenty more to explore with 30 courses)
-            selected_modules = random.sample(module_objects, k=random.randint(2, 5))
+            # Each student starts with 3-8 interactions; structured ratings via affinity.
+            # With 30 courses there's still plenty left to explore.
+            selected_modules = random.sample(module_objects, k=random.randint(3, 8))
             for module in selected_modules:
+                rating, completion = compute_rating(student, module)
                 interaction = InteractionDB(
                     student_id=student.id,
                     module_id=module.id,
-                    rating=random.uniform(1.0, 5.0),
-                    completion_rate=random.uniform(0.4, 1.0) * 100
+                    rating=rating,
+                    completion_rate=completion
                 )
                 db.add(interaction)
                 interactions.append(interaction)
