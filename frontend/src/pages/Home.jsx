@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { recommendationsAPI, modulesAPI } from '../api';
 import { useAuth } from '../AuthContext';
+import { formatNumber } from '../utils/formatters';
 import { RecommendationCard } from '../components/RecommendationCard';
 import { Coefficients } from '../components/Coefficients';
 import '../styles/Home.css';

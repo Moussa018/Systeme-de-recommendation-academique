@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { modulesAPI, interactionsAPI } from '../api';
 import { useAuth } from '../AuthContext';
+import { formatNumber } from '../utils/formatters';
 import '../styles/CourseDetail.css';
 
 export const CourseDetail = () => {
@@ -112,7 +113,7 @@ export const CourseDetail = () => {
 
           <div className="form-group">
             <label htmlFor="rating">
-              Rating: {rating}/5
+              Rating: {formatNumber(rating)}/5.00
             </label>
             <div className="rating-input">
               <input
@@ -125,13 +126,13 @@ export const CourseDetail = () => {
                 onChange={(e) => setRating(parseFloat(e.target.value))}
                 disabled={saving}
               />
-              <span className="rating-value">{rating.toFixed(1)}</span>
+              <span className="rating-value">{formatNumber(rating)}</span>
             </div>
           </div>
 
           <div className="form-group">
             <label htmlFor="completion">
-              Completion: {Math.round(completion)}%
+              Completion: {formatNumber(completion)}%
             </label>
             <div className="progress-bar-container">
               <input
@@ -148,7 +149,7 @@ export const CourseDetail = () => {
               <div className="progress-bar">
                 <div className="progress-fill" style={{ width: `${completion}%` }}></div>
               </div>
-              <span className="completion-value">{Math.round(completion)}%</span>
+              <span className="completion-value">{formatNumber(completion)}%</span>
             </div>
           </div>
 

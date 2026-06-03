@@ -1,15 +1,18 @@
 import React from 'react';
+import { formatScore, formatNumber } from '../utils/formatters';
 import '../styles/RecommendationCard.css';
 
 export const RecommendationCard = ({ recommendation, onClick }) => {
   const scorePercent = (recommendation.score / 5) * 100;
+  const hasGraphScore = recommendation.graph_score !== null && recommendation.graph_score !== undefined && recommendation.graph_score > 0;
+  const hasMLScore = recommendation.ml_score !== null && recommendation.ml_score !== undefined && recommendation.ml_score > 0;
 
   return (
     <div className="recommendation-card" onClick={onClick}>
       <div className="card-header">
         <h3>{recommendation.module_title}</h3>
         <div className="score-badge">
-          {recommendation.score.toFixed(1)}/5
+          {formatScore(recommendation.score)}/5.00
         </div>
       </div>
 
@@ -20,16 +23,22 @@ export const RecommendationCard = ({ recommendation, onClick }) => {
       <p className="reason">{recommendation.reason}</p>
 
       <div className="confidence">
-        <span>Confidence: {(recommendation.confidence * 100).toFixed(0)}%</span>
+        <span>Confidence: {formatNumber(recommendation.confidence * 100)}%</span>
       </div>
 
-      {(recommendation.graph_score || recommendation.ml_score) && (
+      {(hasGraphScore || hasMLScore) && (
         <div className="method-scores">
-          {recommendation.graph_score && (
-            <span className="method-score">Graph: {recommendation.graph_score.toFixed(2)}</span>
+          {hasGraphScore && (
+            <span className="method-score">
+              <span className="method-label">Graph:</span>
+              <span className="method-value">{formatScore(recommendation.graph_score)}</span>
+            </span>
           )}
-          {recommendation.ml_score && (
-            <span className="method-score">ML: {recommendation.ml_score.toFixed(2)}</span>
+          {hasMLScore && (
+            <span className="method-score">
+              <span className="method-label">ML:</span>
+              <span className="method-value">{formatScore(recommendation.ml_score)}</span>
+            </span>
           )}
         </div>
       )}

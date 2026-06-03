@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatCoefficient } from '../utils/formatters';
 import '../styles/Coefficients.css';
 
 export const Coefficients = ({ alpha, beta, interactionCount }) => {
@@ -10,6 +11,8 @@ export const Coefficients = ({ alpha, beta, interactionCount }) => {
 
   const alphaPercent = alpha * 100;
   const betaPercent = beta * 100;
+  const formattedAlpha = formatCoefficient(alpha);
+  const formattedBeta = formatCoefficient(beta);
 
   return (
     <div className="coefficients-box">
@@ -36,7 +39,7 @@ export const Coefficients = ({ alpha, beta, interactionCount }) => {
               style={{ width: `${alphaPercent}%` }}
             ></div>
           </div>
-          <span className="weight-value">α = {alpha.toFixed(3)}</span>
+          <span className="weight-value">α = {formattedAlpha}</span>
         </div>
 
         <div className="weight-item">
@@ -47,7 +50,7 @@ export const Coefficients = ({ alpha, beta, interactionCount }) => {
               style={{ width: `${betaPercent}%` }}
             ></div>
           </div>
-          <span className="weight-value">β = {beta.toFixed(3)}</span>
+          <span className="weight-value">β = {formattedBeta}</span>
         </div>
       </div>
 
