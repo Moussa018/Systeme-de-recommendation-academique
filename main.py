@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime
 import logging
@@ -213,9 +214,41 @@ async def get_recommendations(
             db=db
         )
 
+        # Popularity stats per recommended module: how many students took it
+        # (only rated interactions count toward the average rating).
+        module_ids = [r.module_id for r in recommendations]
+        popularity = {}
+        if module_ids:
+            stats = (
+                db.query(
+                    InteractionDB.module_id,
+                    func.count(InteractionDB.id).label("num_takers"),
+                    func.avg(InteractionDB.rating).label("avg_rating"),
+                )
+                .filter(InteractionDB.module_id.in_(module_ids))
+                .filter(InteractionDB.rating > 0)
+                .group_by(InteractionDB.module_id)
+                .all()
+            )
+            popularity = {
+                row.module_id: {
+                    "num_takers": int(row.num_takers),
+                    "avg_rating": round(float(row.avg_rating), 2) if row.avg_rating is not None else None,
+                }
+                for row in stats
+            }
+
+        recommendations_payload = []
+        for r in recommendations:
+            item = r.dict()
+            pop = popularity.get(r.module_id, {"num_takers": 0, "avg_rating": None})
+            item["num_takers"] = pop["num_takers"]
+            item["avg_rating"] = pop["avg_rating"]
+            recommendations_payload.append(item)
+
         return {
             "student_id": student_id,
-            "recommendations": [r.dict() for r in recommendations],
+            "recommendations": recommendations_payload,
             "interaction_count": interaction_count,
             "alpha": round(alpha, 3),
             "beta": round(beta, 3),
