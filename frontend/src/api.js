@@ -10,7 +10,12 @@ const api = axios.create({
 });
 
 export const authAPI = {
-  login: (studentId) => api.post('/auth/login', { student_id: studentId })
+  login: (studentId) => api.post('/auth/login', { student_id: studentId }),
+  register: (data) => api.post('/auth/register', data)
+};
+
+export const competenciesAPI = {
+  getAll: () => api.get('/competencies')
 };
 
 export const modulesAPI = {

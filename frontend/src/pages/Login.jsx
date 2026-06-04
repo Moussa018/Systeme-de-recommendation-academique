@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../api';
 import { useAuth } from '../AuthContext';
 import '../styles/Login.css';
@@ -50,7 +50,18 @@ export const Login = () => {
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        <p className="info">Try student IDs from 1-15 (sample data)</p>
+        <button
+          type="button"
+          className="secondary-btn"
+          onClick={() => navigate('/register')}
+          disabled={loading}
+        >
+          Create a new account
+        </button>
+        <p className="info">
+          Try student IDs from 1-15 (sample data), or{' '}
+          <Link to="/register">register</Link> a new student.
+        </p>
       </div>
     </div>
   );

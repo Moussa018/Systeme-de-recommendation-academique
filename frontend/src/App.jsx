@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import { Home } from './pages/Home';
 import { CourseDetail } from './pages/CourseDetail';
 
@@ -13,6 +14,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route
         path="/home"
         element={
