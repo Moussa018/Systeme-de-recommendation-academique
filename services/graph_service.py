@@ -220,6 +220,35 @@ class GraphService:
 
         return min(score, 1.0)
     
+    def add_student(self, student_id: int, db: Session):
+        """Incrementally add a newly registered student and their competencies to
+        the in-memory graph, so recommendations work without a server restart.
+        RDF triples are a set, so this is safe even if populate_graph later runs."""
+        try:
+            student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
+            if not student:
+                return
+
+            student_uri = self.ac[f"student_{student.id}"]
+            self.g.add((student_uri, RDF.type, self.ac.Student))
+            self.g.add((student_uri, RDFS.label, Literal(student.name)))
+
+            competencies = db.query(StudentCompetencyDB).filter(
+                StudentCompetencyDB.student_id == student_id
+            ).all()
+            for comp in competencies:
+                competency_uri = self.ac[f"competency_{comp.competency_id}"]
+                self.g.add((student_uri, self.ac.hasCompetency, competency_uri))
+                self.g.add((
+                    student_uri,
+                    self.ac.hasLevel,
+                    Literal(comp.proficiency_level, datatype=XSD.float)
+                ))
+
+            logger.info(f"Added student {student_id} to graph ({len(competencies)} competencies)")
+        except Exception as e:
+            logger.error(f"Error adding student to graph: {str(e)}")
+
     def load_ontology(self):
         """Load ontology from file or create new"""
         if os.path.exists(self.ontology_path):

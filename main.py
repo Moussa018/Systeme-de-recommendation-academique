@@ -8,7 +8,7 @@ import logging
 from pydantic import BaseModel
 
 from database import engine, Base, get_db
-from models import StudentDB, ModuleDB, InteractionDB
+from models import StudentDB, ModuleDB, InteractionDB, CompetencyDB, StudentCompetencyDB
 from schemas import StudentSchema, ModuleSchema, RecommendationResponse
 from services.graph_service import GraphService
 from services.ml_service import MLService
@@ -23,6 +23,12 @@ logger = logging.getLogger(__name__)
 
 class LoginRequest(BaseModel):
     student_id: int
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    major: Optional[str] = "Undeclared"
+    competency_ids: List[int] = []
 
 
 class InteractionUpdate(BaseModel):
@@ -129,6 +135,61 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         "major": student.major,
         "year": student.year,
         "token": f"student_{student.id}"
+    }
+
+
+@app.get("/competencies", tags=["Competencies"])
+async def get_competencies(db: Session = Depends(get_db)):
+    """List available skills/competencies for registration"""
+    competencies = db.query(CompetencyDB).order_by(CompetencyDB.name).all()
+    return [{"id": c.id, "name": c.name} for c in competencies]
+
+
+@app.post("/auth/register", tags=["Auth"])
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    """Register a new student. The student ID is auto-assigned. Selected skills
+    seed the student's competencies so the Knowledge Graph has data to work with
+    from the very first (cold-start) recommendation."""
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    # Auto-assign the next student ID
+    max_id = db.query(func.max(StudentDB.id)).scalar() or 0
+    new_id = max_id + 1
+    email = f"student{new_id}@university.edu"
+
+    student = StudentDB(
+        id=new_id,
+        name=name,
+        email=email,
+        major=request.major or "Undeclared",
+        year=1,
+    )
+    db.add(student)
+    db.flush()
+
+    # Selected skills become competencies with a default starting proficiency
+    for cid in request.competency_ids:
+        if db.query(CompetencyDB).filter(CompetencyDB.id == cid).first():
+            db.add(StudentCompetencyDB(
+                student_id=new_id,
+                competency_id=cid,
+                proficiency_level=0.5,
+            ))
+    db.commit()
+
+    # Keep the live graph and ML model in sync without requiring a restart
+    graph_service.add_student(new_id, db)
+    ml_service.model_trained = False
+
+    return {
+        "id": new_id,
+        "name": name,
+        "email": email,
+        "major": student.major,
+        "year": 1,
+        "token": f"student_{new_id}"
     }
 
 
