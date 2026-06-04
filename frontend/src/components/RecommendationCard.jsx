@@ -1,23 +1,34 @@
 import React from 'react';
-import { formatScore, formatNumber } from '../utils/formatters';
+import { formatNumber } from '../utils/formatters';
 import '../styles/RecommendationCard.css';
 
 export const RecommendationCard = ({ recommendation, onClick }) => {
-  const scorePercent = recommendation.score * 100;
   const hasGraphScore = recommendation.graph_score !== null && recommendation.graph_score !== undefined && recommendation.graph_score > 0;
   const hasMLScore = recommendation.ml_score !== null && recommendation.ml_score !== undefined && recommendation.ml_score > 0;
+
+  const hasRating = recommendation.avg_rating !== null && recommendation.avg_rating !== undefined;
+  const numTakers = recommendation.num_takers || 0;
 
   return (
     <div className="recommendation-card" onClick={onClick}>
       <div className="card-header">
         <h3>{recommendation.module_title}</h3>
-        <div className="score-badge">
-          {formatNumber(scorePercent)}%
+        <div className={`rating-badge ${hasRating ? '' : 'rating-badge--new'}`}>
+          {hasRating ? (
+            <>
+              <span className="rating-star">★</span>
+              {formatNumber(recommendation.avg_rating)}
+            </>
+          ) : (
+            'New'
+          )}
         </div>
       </div>
 
-      <div className="score-bar">
-        <div className="score-fill" style={{ width: `${scorePercent}%` }}></div>
+      <div className="popularity">
+        {numTakers > 0
+          ? `👥 Taken by ${numTakers} student${numTakers === 1 ? '' : 's'}`
+          : 'No students have taken this yet'}
       </div>
 
       <p className="reason">{recommendation.reason}</p>

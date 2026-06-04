@@ -28,29 +28,37 @@
   flex: 1;
 }
 
-.score-badge {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.rating-badge {
+  background: linear-gradient(135deg, #f6a609 0%, #f57c00 100%);
   color: white;
   padding: 8px 12px;
   border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
   white-space: nowrap;
   margin-left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.score-bar {
-  height: 6px;
-  background-color: #e0e0e0;
-  border-radius: 3px;
-  overflow: hidden;
+.rating-badge--new {
+  background: #e0e0e0;
+  color: #777;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.rating-star {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.popularity {
+  color: #555;
+  font-size: 13px;
   margin-bottom: 12px;
-}
-
-.score-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  transition: width 0.3s ease;
+  font-weight: 500;
 }
 
 .reason {
