@@ -22,6 +22,7 @@ class MLService:
         self.n_factors = n_factors
         self.user_factors = None
         self.item_factors = None
+        self.user_means = None
         self.students = []
         self.modules = []
         self.interaction_matrix = None
@@ -54,8 +55,22 @@ class MLService:
                     logger.warning("Not enough data for SVD training")
                     return False
 
+                # Mean-center over OBSERVED (non-zero) entries per user. Unseen
+                # cells stay 0, so after factorization they reconstruct toward the
+                # user's mean rather than toward 0 (avoids the implicit-feedback
+                # bias of treating "not taken" as a rating of zero).
+                observed_mask = self.interaction_matrix > 0
+                row_sums = self.interaction_matrix.sum(axis=1)
+                row_counts = observed_mask.sum(axis=1)
+                self.user_means = np.divide(
+                    row_sums, row_counts,
+                    out=np.zeros_like(row_sums, dtype=float),
+                    where=row_counts > 0
+                )
+                centered = self.interaction_matrix - self.user_means[:, None] * observed_mask
+
                 svd = TruncatedSVD(n_components=n_components, random_state=42)
-                self.user_factors = svd.fit_transform(self.interaction_matrix)
+                self.user_factors = svd.fit_transform(centered)
                 self.item_factors = svd.components_.T
                 self.model_trained = True
                 logger.info(f"Model trained with {len(self.students)} students and {len(self.modules)} modules (n_components={n_components})")
@@ -116,8 +131,11 @@ class MLService:
             if self.user_factors is None or student_idx >= len(self.user_factors):
                 return []
 
-            # Use SVD reconstruction: predicted_matrix = user_factors @ item_factors.T
-            predicted_scores = self.user_factors[student_idx] @ self.item_factors.T
+            # SVD reconstruction + user mean (we centered before factorizing).
+            predicted_scores = (
+                self.user_factors[student_idx] @ self.item_factors.T
+                + self.user_means[student_idx]
+            )
             predicted_scores = np.clip(predicted_scores, 0, 5.0)  # Clip to reasonable rating range
 
             # Get modules student has already taken
@@ -156,30 +174,6 @@ class MLService:
             logger.error(f"Error in ML recommendations: {str(e)}")
             return []
     
-    def _compute_similarities(self, student_vector: np.ndarray) -> np.ndarray:
-        """Compute cosine similarities between student and all other students"""
-        if self.user_factors is None:
-            return np.zeros(len(self.students))
-
-        # Normalize vectors
-        student_norm = np.linalg.norm(student_vector)
-        if student_norm == 0:
-            return np.zeros(len(self.students))
-
-        normalized_student = student_vector / student_norm
-
-        similarities = []
-        for i, user_vector in enumerate(self.user_factors):
-            user_norm = np.linalg.norm(user_vector)
-            if user_norm == 0:
-                similarities.append(0)
-            else:
-                normalized_user = user_vector / user_norm
-                similarity = np.dot(normalized_student, normalized_user)
-                similarities.append(similarity)
-
-        return np.array(similarities)
-
     def predict_score(self, student_id: int, module_id: int, db: Session) -> float:
         """Predict rating for a (student, module) pair using SVD reconstruction"""
         try:
@@ -196,7 +190,10 @@ class MLService:
             student_idx = student_idx_map[student_id]
             module_idx = module_idx_map[module_id]
 
-            predicted_score = float(self.user_factors[student_idx] @ self.item_factors[module_idx])
+            predicted_score = float(
+                self.user_factors[student_idx] @ self.item_factors[module_idx]
+                + self.user_means[student_idx]
+            )
             return np.clip(predicted_score, 0, 5.0)
         except Exception as e:
             logger.error(f"Error predicting score: {str(e)}")
