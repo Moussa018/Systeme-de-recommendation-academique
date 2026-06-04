@@ -342,6 +342,10 @@ async def update_or_create_interaction(
     db.commit()
     db.refresh(interaction)
 
+    # Invalidate the trained ML model so it retrains with the new interaction
+    # on the next recommendation request (training is cheap at this scale).
+    ml_service.model_trained = False
+
     return {
         "id": interaction.id,
         "student_id": interaction.student_id,
