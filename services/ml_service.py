@@ -150,7 +150,9 @@ class MLService:
 
             for module_id, module in enumerate(self.modules):
                 if module.id not in taken_module_ids:
-                    score = float(predicted_scores[module_idx_map[module.id]])
+                    # Predicted rating is on a 0-5 scale; normalize to 0-1 so it
+                    # matches the graph score's scale for fusion and display.
+                    score = float(predicted_scores[module_idx_map[module.id]]) / 5.0
                     scored_modules.append((module.id, module.title, score))
 
             # Sort by predicted score and limit
@@ -163,7 +165,7 @@ class MLService:
                     module_id=module_id,
                     module_title=title,
                     score=score,
-                    confidence=min(0.95, abs(score) / 5.0 * 0.95),
+                    confidence=min(0.95, abs(score) * 0.95),
                     reason="Matches your learning profile",
                     ml_score=score
                 ))
