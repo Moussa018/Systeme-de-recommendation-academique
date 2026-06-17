@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 from pydantic import BaseModel
 
-from database import engine, Base, get_db
+from database import engine, Base, get_db, SessionLocal
 from models import StudentDB, ModuleDB, InteractionDB, CompetencyDB, StudentCompetencyDB
 from schemas import StudentSchema, ModuleSchema, RecommendationResponse
 from services.graph_service import GraphService
@@ -96,16 +96,29 @@ evaluation_service = EvaluationService(graph_service, ml_service, fusion_service
 async def startup_event():
     """Initialize the system on startup"""
     logger.info("Initializing Academic Recommendation System...")
-    
-    # Load or generate sample data
+
+    # Seed the database if it is empty. This is essential when running against a
+    # fresh PostgreSQL volume (Docker): sample data baked into the image at build
+    # time lives in a throwaway SQLite file, not in the runtime database.
+    db = SessionLocal()
+    try:
+        if db.query(StudentDB).count() == 0:
+            logger.info("Empty database detected. Generating sample data...")
+            generate_sample_data()
+        else:
+            logger.info("Existing data found, skipping sample data generation")
+    except Exception as e:
+        logger.error(f"Error while seeding the database: {e}")
+    finally:
+        db.close()
+
+    # Load (or create) the Knowledge Graph ontology
     try:
         logger.info("Loading Knowledge Graph and ML models...")
         graph_service.load_ontology()
         logger.info("System initialized successfully")
     except Exception as e:
-        logger.warning(f"First run detected. Generating sample data: {e}")
-        # Generate sample data on first run
-        generate_sample_data()
+        logger.warning(f"Could not load ontology, it will be rebuilt on demand: {e}")
 
 @app.get("/health", tags=["Health"])
 async def health_check():
